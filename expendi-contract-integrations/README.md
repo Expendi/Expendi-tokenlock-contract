@@ -12,12 +12,21 @@ Smart contracts for time-locked yield-generating deposits using ERC-4626 vaults.
 
 ## Deployments
 
-### YieldTimeLock
+### YieldTimeLock (v2 - Current)
+
+| Network | Address | Explorer |
+|---------|---------|----------|
+| Base Mainnet | `0x3da4E8d093051603519aCE4E3472C7c5d5Cf56d6` | [basescan.org](https://basescan.org/address/0x3da4E8d093051603519aCE4E3472C7c5d5Cf56d6) |
+| Base Sepolia | `0xeA70131274f6a69c7175be61Cef4fcFaF30579e9` | [sepolia.basescan.org](https://sepolia.basescan.org/address/0xeA70131274f6a69c7175be61Cef4fcFaF30579e9) |
+
+### YieldTimeLock (v1 - Deprecated)
 
 | Network | Address | Explorer |
 |---------|---------|----------|
 | Base Mainnet | `0x3e6305dBC35f4782fc5267dfa0c202aFB441DC74` | [basescan.org](https://basescan.org/address/0x3e6305dBC35f4782fc5267dfa0c202aFB441DC74) |
 | Base Sepolia | `0x3da4E8d093051603519aCE4E3472C7c5d5Cf56d6` | [sepolia.basescan.org](https://sepolia.basescan.org/address/0x3da4E8d093051603519aCE4E3472C7c5d5Cf56d6) |
+
+> **Note:** v1 contracts remain active for existing locks. New deposits should use v2.
 
 **Configuration:**
 - Owner: `0xAE609c3904C539aF2Ac11a86D0B030a77dB0a509`
