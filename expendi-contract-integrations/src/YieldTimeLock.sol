@@ -238,6 +238,9 @@ contract YieldTimeLock is Ownable, ReentrancyGuard {
     /// @notice Thrown when trying to emergency withdraw a lock that's already processed.
     error LockAlreadyProcessed();
 
+    /// @notice Thrown when trying to interact with a lock that does not exist.
+    error LockDoesNotExist();
+
     // =========================================================================
     //                            Constructor
     // =========================================================================
@@ -343,6 +346,8 @@ contract YieldTimeLock is Ownable, ReentrancyGuard {
     function extendLock(uint256 lockId, uint256 newUnlockTime) external onlyOwner {
         YieldLock storage lock = yieldLocks[lockId];
 
+        if (lock.depositor == address(0)) revert LockDoesNotExist();
+        if (lock.withdrawn || lock.isEmergencyWithdrawn) revert LockAlreadyProcessed();
         if (newUnlockTime <= lock.unlockTime) revert NewUnlockTimeMustBeAfterCurrent();
 
         uint256 oldUnlockTime = lock.unlockTime;
@@ -369,6 +374,29 @@ contract YieldTimeLock is Ownable, ReentrancyGuard {
         emergencyAssets[lockId] = assetsReceived;
 
         emit EmergencyWithdrawal(lockId, lock.vault, lock.shares, assetsReceived);
+    }
+
+    /**
+     * @notice Batch emergency withdrawal: redeems shares for multiple locks.
+     * @dev Only the owner can call this. Use when a vault has liquidity problems
+     *      and multiple locks need to be rescued quickly.
+     * @param lockIds The array of lock IDs to emergency withdraw.
+     */
+    function emergencyWithdrawBatch(uint256[] calldata lockIds) external onlyOwner nonReentrant {
+        for (uint256 i = 0; i < lockIds.length; i++) {
+            uint256 lockId = lockIds[i];
+            YieldLock storage lock = yieldLocks[lockId];
+
+            if (lock.withdrawn || lock.isEmergencyWithdrawn) revert LockAlreadyProcessed();
+
+            lock.isEmergencyWithdrawn = true;
+
+            uint256 assetsReceived = IMorphoVault(lock.vault).redeem(lock.shares, address(this), address(this));
+
+            emergencyAssets[lockId] = assetsReceived;
+
+            emit EmergencyWithdrawal(lockId, lock.vault, lock.shares, assetsReceived);
+        }
     }
 
     /**
@@ -500,7 +528,9 @@ contract YieldTimeLock is Ownable, ReentrancyGuard {
      * @return unlocked True if `block.timestamp >= lock.unlockTime`.
      */
     function isUnlocked(uint256 lockId) external view returns (bool unlocked) {
-        unlocked = block.timestamp >= yieldLocks[lockId].unlockTime;
+        YieldLock storage lock = yieldLocks[lockId];
+        if (lock.depositor == address(0)) revert LockDoesNotExist();
+        unlocked = block.timestamp >= lock.unlockTime;
     }
 
     /**
@@ -536,6 +566,10 @@ contract YieldTimeLock is Ownable, ReentrancyGuard {
     {
         YieldLock storage lock = yieldLocks[lockId];
 
+        if (lock.withdrawn) {
+            return (0, 0, 0);
+        }
+
         if (lock.isEmergencyWithdrawn) {
             totalAssets = emergencyAssets[lockId];
         } else {
@@ -557,6 +591,10 @@ contract YieldTimeLock is Ownable, ReentrancyGuard {
     function getAccruedYield(uint256 lockId) external view returns (uint256 yield, uint256 currentAssets) {
         YieldLock storage lock = yieldLocks[lockId];
 
+        if (lock.withdrawn) {
+            return (0, 0);
+        }
+
         if (lock.isEmergencyWithdrawn) {
             currentAssets = emergencyAssets[lockId];
         } else {
@@ -570,6 +608,8 @@ contract YieldTimeLock is Ownable, ReentrancyGuard {
 
     /**
      * @notice Returns all lock IDs belonging to a user with a specific label.
+     * @dev Warning: May run out of gas for users with many locks. Use the
+     *      paginated version (with offset/limit) for production integrations.
      * @param user The address to query.
      * @param label The label to filter by.
      * @return lockIds An array of lock IDs matching the label.
@@ -596,6 +636,47 @@ contract YieldTimeLock is Ownable, ReentrancyGuard {
             if (_stringsEqual(yieldLocks[allLockIds[i]].label, label)) {
                 lockIds[idx++] = allLockIds[i];
             }
+        }
+    }
+
+    /**
+     * @notice Returns lock IDs belonging to a user with a specific label (paginated).
+     * @dev Use this function for users with many locks to avoid gas limit issues.
+     * @param user The address to query.
+     * @param label The label to filter by.
+     * @param offset The starting index in the user's lock array.
+     * @param limit The maximum number of matching locks to return.
+     * @return lockIds An array of lock IDs matching the label.
+     * @return hasMore True if there are more locks beyond this page.
+     */
+    function getUserLocksByLabelPaginated(address user, string calldata label, uint256 offset, uint256 limit)
+        external
+        view
+        returns (uint256[] memory lockIds, bool hasMore)
+    {
+        uint256[] storage allLockIds = userYieldLocks[user];
+        uint256 length = allLockIds.length;
+
+        if (offset >= length) {
+            return (new uint256[](0), false);
+        }
+
+        uint256[] memory tempMatches = new uint256[](limit);
+        uint256 matchCount;
+        uint256 i = offset;
+
+        while (i < length && matchCount < limit) {
+            if (_stringsEqual(yieldLocks[allLockIds[i]].label, label)) {
+                tempMatches[matchCount++] = allLockIds[i];
+            }
+            i++;
+        }
+
+        hasMore = i < length;
+
+        lockIds = new uint256[](matchCount);
+        for (uint256 j = 0; j < matchCount; j++) {
+            lockIds[j] = tempMatches[j];
         }
     }
 
