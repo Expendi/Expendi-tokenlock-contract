@@ -48,6 +48,8 @@ from expendi_ethereum.TimeLock_evt_LockCreated
 | `06_user_cohort_analysis.sql` | User retention by cohort | Heatmap |
 | `07_emergency_withdrawal_monitor.sql` | Emergency events list | Table |
 | `08_lock_duration_distribution.sql` | Lock duration buckets | Pie chart |
+| `09_total_deposited.sql` | All-time principal deposited, with and without the largest depositor | Counter |
+| `10_monthly_deposits.sql` | Principal deposited per month, largest depositor vs everyone else | Stacked bar |
 
 ## Dashboard Structure
 
@@ -55,6 +57,8 @@ Recommended dashboard layout:
 
 ### Section 1: Overview
 - **TVL Counter** (Query 1 - aggregate)
+- **Total Deposited Counter** (Query 9)
+- **Monthly Deposits Chart** (Query 10)
 - **Daily Activity Chart** (Query 2)
 
 ### Section 2: TimeLock Analytics
